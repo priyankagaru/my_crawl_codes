@@ -1,0 +1,92 @@
+import re
+import urllib
+from datetime import datetime
+from datetime import date
+import csv
+import unicodedata
+import os
+from selenium import webdriver
+import time
+ 
+now = datetime.now()
+current_time = now.strftime("%H:%M:%S")
+date = date.today()
+wd = date.weekday()
+days = ["Mon", "Tue", "Wed", "Thu", "Fri", "Saturday", "Sunday"]
+day = days[wd]
+date = str(date)
+date = date.split("-")
+month = {'1': 'Jan', '2': 'Feb', '3': 'Mar', '4': 'Apr', '5': 'May', '6': 'June', '7': 'July', '8': 'Aug', '9': 'Sep', '10': 'Oct', '11': 'Nov', '12': 'Dec'}
+day_date_time = day + " " + month[str(date[1])] + " " + date[2] + " " + date[0] + " " + current_time + " " + "IST"
+url = "https://www.filmibeat.com/kannada/movies-by-year/2020.html"
+res = urllib.urlopen(url).read()
+film_name = re.findall(r'<div class="movie-name">\s*<a.*?>(.*?)</a>', res, flags=re.DOTALL)
+release_date = re.findall(r"<span> Release Date :</span>\s*(.*?)\s*</div>", res, flags=re.DOTALL)
+url_list = re.findall(r'<div class="movie-img-block">\s*<a href="(.*?)"', res, flags=re.DOTALL)
+res_list = list()
+release_month = list()
+release_year = list()
+music_director_list = list()
+for i in range(len(film_name)):
+    date_box = release_date[i].split(" ")
+    if len(date_box) == 2:
+        release_month.append(date_box[0])
+        release_year.append(date_box[1])
+    else:
+        release_month.append(date_box[1])
+        release_year.append(date_box[2])
+    sub_res = urllib.urlopen(url_list[i]).read()
+    director = re.findall(r'<span>Director :</span> <a.*?>(.*?)</a>', sub_res, flags=re.DOTALL)
+    director = str(director).replace("[", "").replace("]", "").replace('"', '').replace("'", "")
+    music_director = re.search(r'Producer.*?<div class="crew-name">\s*(.*?)\s*</div>', sub_res, flags=re.DOTALL)
+    if music_director:
+        music_director_list.append(music_director.group(1))
+    else:
+        music_director1 = re.search(r'<div class="char-name">\s*Director.*?<div class="crew-name">\s*(.*?)\s*</div>', sub_res, flags=re.DOTALL)
+        if music_director1:
+            music_director_list.append(music_director1.group(1))
+        else:
+            music_director_list.append("")
+    producer = re.findall(r'<div class="char-name">\s*Director.*?<div class="crew-name">\s*(.*?)\s*</div>.*?Producer', sub_res, flags=re.DOTALL)
+    producer = str(producer).replace("[", "").replace("]", "").replace('"', '').replace("'", "")
+    genre = re.findall(r'<div class="ov-mov-timing">(.*?)</div>', sub_res, flags=re.DOTALL)
+    genre_regex1 = re.findall(r'<span><a href=.*?>(.*?)</a>', genre[0], flags=re.DOTALL)
+    genre = str(genre_regex1).replace("[", "").replace("]", "").replace('"', '').replace("'", "")
+    cast = re.findall(r'<div class="cast-name">\s*(.*?)\s*</div>', sub_res, flags=re.DOTALL)
+    cast = str(cast).replace("[", "").replace("]", "").replace('"', '').replace("'", "")
+    sub_url = re.search(r'<li class="primary-nav__item">.*?<li class="primary-nav__item">.*?<li class="primary-nav__item">.*?<li class="primary-nav__item"><a href="(.*?)">', sub_res, flags=re.DOTALL)
+    if sub_url:
+        sub_url = sub_url.group(1)
+        sub_sub_res = urllib.urlopen(sub_url).read()
+        song = re.findall(r'<div class="rev-mov-name">\s*(.*?)\s*<div class="mov-singer">', sub_sub_res,
+                          flags=re.DOTALL)
+        song = str(song).replace("[", "").replace("]", "").replace('"', '').replace("'", "")
+    else:
+        song = ""
+    res_dict = dict()
+    res_dict.update({"Film_name": film_name[i]})
+    res_dict.update({"Cast": cast})
+    res_dict.update({"Extraction Time": day_date_time})
+    res_dict.update({"Release_Date": release_date[i]})
+    res_dict.update({"Release_Month": release_month[i]})
+    res_dict.update({"Release_Year": release_year[i]})
+    res_dict.update({"Producer": producer})
+    res_dict.update({"Director": director})
+    res_dict.update({"Music_Director": music_director_list[i]})
+    res_dict.update({"Genre": genre})
+    res_dict.update({"Banner": ""})
+    res_dict.update({"Main Url": url})
+    res_dict.update({"Url": url_list[i]})
+    res_dict.update({"Locale": "Kannada"})
+    res_dict.update({"Songs": song})
+    res_dict.update({"Film_Status": "Upcoming Movie"})
+    res_list.append(res_dict)
+print(res_list)
+print(len(res_list))
+csv_columns = ['Film_name', 'Cast', 'Extraction Time', "Release_Date", "Release_Month", "Release_Year", 'Producer', 'Director', 'Music_Director', 'Genre', 'Banner', 'Main Url', 'Url', 'Locale', 'Songs', 'Film_Status']
+csv_file = "filmibeat_kannada_upcoming.csv"
+with open(csv_file, 'w') as csvfile:
+    writer = csv.DictWriter(csvfile, fieldnames=csv_columns)
+    writer.writeheader()
+    for data in res_list:
+        writer.writerow(data)
