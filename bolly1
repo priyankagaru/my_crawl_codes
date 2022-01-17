@@ -1,0 +1,68 @@
+import re
+import urllib
+from datetime import datetime
+from datetime import date
+import csv
+import unicodedata
+import os
+from selenium import webdriver
+import time
+ 
+chromedriver = "/usr/local/google/home/krishnamaraja/Downloads/chromedriver"
+browser = webdriver.Chrome(executable_path=chromedriver)
+now = datetime.now()
+current_time = now.strftime("%H:%M:%S")
+date = date.today()
+wd = date.weekday()
+days = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
+day = days[wd]
+day_date_time = day + "_" + str(date) + "_" + current_time
+url = "https://www.bollywoodmdb.com/movies/new-releases"
+res = urllib.urlopen(url).read()
+film_name = re.findall(r'<div itemprop="name">.*?<strong>(.*?)</strong>', res, flags=re.DOTALL)
+director = re.findall(r'<strong class="lab">Director:.*?<span itemprop="name">(.*?)</span>', res, flags=re.DOTALL)
+release_date = re.findall(r"Release:</strong>\s*(.*?)<meta.*?>", res, flags=re.DOTALL)
+url_list = re.findall(r'<a class="cus-none w3-large lab" href="(.*?)"', res, flags=re.DOTALL)
+res_list = list()
+for i in range(len(film_name)):
+    release_year = release_date[i].split(",")
+    release_month = release_year[0].split(" ")
+    sub_res = urllib.urlopen(url_list[i]).read()
+    cast = re.findall(r'<div class="w3-left de-margin-top de-margin-right title_space_sub"> <a class="w3-medium cus-none titlecolor".*?>(.*?)</a>', sub_res, flags=re.DOTALL)
+    cast = str(cast).replace("[", "").replace("]", "").replace('"', '').replace("'", "")
+    producer = re.findall(r'Producer:.*?<span >(.*?)</span>', sub_res, flags=re.DOTALL)
+    producer = str(producer).replace("[", "").replace("]", "").replace('"', '').replace("'", "")
+    sub_url = re.search(r'<div class="bar-item-mar-5 mo-border-rig w3-bar-item w3-border-left w3-border-right mo-border w3-border-top w3-border-bottom w3-border-gray"> <a class="titlecolor cus-none" href="(.*?)"', sub_res, flags=re.DOTALL).group(1)
+    sub_sub_res = urllib.urlopen(sub_url).read()
+    banner = re.findall(r'BANNER(.*?)DIRECTOR', sub_sub_res, flags=re.DOTALL)
+    if banner:
+        banner_regex = re.findall(r'<strong>(.*?)</strong>', banner[0], flags=re.DOTALL)
+        banner_regex = str(banner_regex).replace("[", "").replace("]", "").replace('"', '').replace("'", "")
+    else:
+        banner_regex = ""
+    res_dict = dict()
+    res_dict.update({"Film_name": film_name[i]})
+    res_dict.update({"Cast": cast})
+    res_dict.update({"Extraction Time": day_date_time})
+    res_dict.update({"Release_Date": release_date[i]})
+    res_dict.update({"Release_Month": release_month[1]})
+    res_dict.update({"Release_Year": release_year[1]})
+    res_dict.update({"Producer": producer})
+    res_dict.update({"Director": director[i]})
+    res_dict.update({"Music_Director": ""})
+    res_dict.update({"Genre": ""})
+    res_dict.update({"Banner": banner_regex})
+    res_dict.update({"Main Url": url})
+    res_dict.update({"Url": url_list[i]})
+    res_dict.update({"Locale": ""})
+    res_dict.update({"Songs": ""})
+    res_list.append(res_dict)
+print(res_list)
+print(len(res_list))
+csv_columns = ['Film_name', 'Cast', 'Extraction Time', "Release_Date", "Release_Month", "Release_Year", 'Producer', 'Director', 'Music_Director', 'Genre', 'Banner', 'Main Url', 'Url', 'Locale', 'Songs']
+csv_file = "bollywood_mdb_new_releases.csv"
+with open(csv_file, 'w') as csvfile:
+    writer = csv.DictWriter(csvfile, fieldnames=csv_columns)
+    writer.writeheader()
+    for data in res_list:
+        writer.writerow(data)
